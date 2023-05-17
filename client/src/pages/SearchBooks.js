@@ -62,7 +62,7 @@ const SearchBooks = () => {
   };
 
   // Apollo mutation hook
-  const [saveBook] = useMutation(SAVE_BOOK);
+  const [saveBook, {error}] = useMutation(SAVE_BOOK);
 
   // create function to handle saving a book to our database
   const handleSaveBook = async (bookId) => {

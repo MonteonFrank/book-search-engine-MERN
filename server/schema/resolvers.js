@@ -1,69 +1,91 @@
-const { AuthenticationError } = require('apollo-server-express');
-const { User } = require('../models');
-const { signToken } = require('../utils/auth');
-const jwt = require('jsonwebtoken');
+const { AuthenticationError } = require("apollo-server-express");
+const { User, Book } = require("../models");
+const { signToken } = require("../utils/auth");
+const jwt = require("jsonwebtoken");
 
 const resolvers = {
   Query: {
-    getUserById: async (parent, { userId }, context) => {
+    getUserById: async (parent, { userId, username }, context) => {
       try {
-        context.authMiddleware(); // Check if user is authenticated
-        const user = await User.findById(userId).populate('savedBooks');
+        let user;
+        if (userId) {
+          user = await User.findById(userId).select("username email");
+        } else if (username) {
+          user = await User.findOne({ username }).select("username email");
+        }
         return user;
       } catch (error) {
         console.error(error);
-        throw new Error('Failed to fetch user by ID');
+        throw new Error("Failed to retrieve user");
       }
     },
   },
+  
   Mutation: {
     createUser: async (parent, { username, email, password }) => {
       try {
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-        const user = new User({ username, email, password: hashedPassword });
-        await user.save();
-        return user;
+        const user = await User.create({ username, email, password });
+        const token = signToken(user);
+        return { token, user, userId: user._id };
       } catch (error) {
         console.error(error);
-        throw new Error('Failed to create user');
+        throw new Error("Failed to create user");
       }
     },
     login: async (parent, { email, password }) => {
       try {
         const user = await User.findOne({ email });
+
         if (!user) {
-          throw new Error('User not found');
+          throw new AuthenticationError("No user found with this email address");
         }
 
-        const correctPassword = await user.isCorrectPassword(password);
-        if (!correctPassword) {
-          throw new Error('Invalid password');
+        const correctPw = await user.isCorrectPassword(password);
+
+        if (!correctPw) {
+          throw new AuthenticationError("Incorrect credentials");
         }
 
         const token = signToken(user);
         return { token, user };
       } catch (error) {
         console.error(error);
-        throw new Error('Failed to log in');
+        throw new Error("Failed to log in");
       }
     },
-    addBook: async (parent, { userId, bookInput }, context) => {
+    saveBook: async (parent, { bookInput }, context) => {
       try {
-        context.authMiddleware(); // Check if user is authenticated
-        const user = await User.findById(userId);
-        const book = new Book(bookInput);
-        user.savedBooks.push(book);
+        if (!context.user) {
+          throw new AuthenticationError("You must be logged in to save a book");
+        }
+        const newBook = new Book(bookInput);
+        const user = await User.findById(context.user._id);
+        user.savedBooks.push(newBook);
         await user.save();
         return user;
       } catch (error) {
-        console.error(error);
-        throw new Error('Failed to add book');
+        console.log(error);
+        throw new Error("Failed to save book");
       }
     },
-  },
-  User: {
-    bookCount: (parent) => parent.savedBooks.length,
+    removeBook: async (parent, { bookId }, context) => {
+      try {
+        if (!context.user) {
+          throw new AuthenticationError("You must be logged in to remove a book");
+        }
+        const user = await User.findById(context.user._id);
+        const bookIndex = user.savedBooks.findIndex((book) => book.bookId === bookId);
+        if (bookIndex === -1) {
+          throw new Error("Book not found in saved books");
+        }
+        user.savedBooks.splice(bookIndex, 1);
+        await user.save();
+        return user;
+      } catch (error) {
+        console.log(error);
+        throw new Error("Failed to remove book");
+      }
+    },
   },
 };
 
