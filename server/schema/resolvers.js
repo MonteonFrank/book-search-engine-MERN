@@ -20,6 +20,12 @@ const resolvers = {
         throw new Error("Failed to retrieve user");
       }
     },
+        me: async (parent, args, context) => {
+      if (context.user._id) {
+        return User.findOne({ _id: context.user._id });
+      }
+      throw new AuthenticationError('You need to be logged in!');
+    },
   },
   
   Mutation: {
