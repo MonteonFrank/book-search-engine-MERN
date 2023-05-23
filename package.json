@@ -2,7 +2,7 @@
   "name": "book-search-engine-MERN",
   "version": "1.0.0",
   "description": "",
-  "main": "server/server.js",
+  "main": "./server/server.js",
   "proxy": "localhost:3001/",
   "scripts": {
     "start": "server.js --ignore client",
